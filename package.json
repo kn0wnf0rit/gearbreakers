@@ -1,0 +1,19 @@
+{
+  "name": "gearbreakers",
+  "version": "0.1.0",
+  "description": "Gearbreakers - A steampunk-dystopian turn-based RPG in the browser",
+  "type": "module",
+  "scripts": {
+    "dev": "npx http-server . -p 8080 -c-1",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@jest/globals": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "keywords": ["game", "rpg", "turn-based", "steampunk", "pixel-art"],
+  "license": "MIT"
+}
