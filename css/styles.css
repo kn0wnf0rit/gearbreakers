@@ -1,0 +1,38 @@
+/* Gearbreakers — Global Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+  font-family: monospace;
+}
+
+#game-container {
+  position: relative;
+  line-height: 0;
+}
+
+#game-canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  /* 256 * 3 = 768, 224 * 3 = 672 */
+  width: 768px;
+  height: 672px;
+  border: 2px solid #333;
+}
+
+/* Prevent text selection on the page */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
