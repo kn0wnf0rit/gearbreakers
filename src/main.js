@@ -61,27 +61,43 @@ class Game {
     this._showTitleScreen();
     this._running = true;
     this._lastTime = performance.now();
-    requestAnimationFrame((t) => this._loop(t));
-  }
 
-  // ─── Game Loop ───
+    // Use RAF with setInterval fallback for environments where RAF doesn't fire
+    // (e.g., hidden tabs, some preview tools)
+    const tick = () => {
+      if (!this._running) return;
+      try {
+        const now = performance.now();
+        const dt = (now - this._lastTime) / 1000;
+        this._lastTime = now;
+        this.gameState.playtime += dt;
 
-  _loop(timestamp) {
-    if (!this._running) return;
+        this.input.update();
+        this.sceneManager.update(dt, this.input);
+        this.renderer.clear('#000');
+        this.sceneManager.render(this.renderer);
+      } catch (e) {
+        console.error('[Gearbreakers] Loop error:', e);
+        this._running = false;
+      }
+    };
 
-    const dt = (timestamp - this._lastTime) / 1000; // seconds
-    this._lastTime = timestamp;
-    this.gameState.playtime += dt;
+    // Try RAF first; fall back to setInterval if RAF doesn't fire within 100ms
+    let rafFired = false;
+    const fallbackTimer = setTimeout(() => {
+      if (!rafFired) {
+        console.log('[Gearbreakers] RAF unavailable, using setInterval');
+        setInterval(tick, 1000 / 60);
+      }
+    }, 100);
 
-    // Input
-    this.input.update();
-
-    // Update & Render
-    this.sceneManager.update(dt, this.input);
-    this.renderer.clear('#000');
-    this.sceneManager.render(this.renderer);
-
-    requestAnimationFrame((t) => this._loop(t));
+    const rafLoop = () => {
+      rafFired = true;
+      clearTimeout(fallbackTimer);
+      tick();
+      if (this._running) requestAnimationFrame(rafLoop);
+    };
+    requestAnimationFrame(rafLoop);
   }
 
   // ─── Title Screen ───
@@ -330,7 +346,20 @@ class Game {
 }
 
 // ─── Boot ───
-window.addEventListener('DOMContentLoaded', () => {
-  const game = new Game();
-  game.start();
-});
+function boot() {
+  const canvas = document.getElementById('game-canvas');
+  if (!canvas || canvas.dataset.booted) return;
+  canvas.dataset.booted = 'true';
+  try {
+    const game = new Game();
+    game.start();
+  } catch (e) {
+    console.error('[Gearbreakers] Boot failed:', e);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
