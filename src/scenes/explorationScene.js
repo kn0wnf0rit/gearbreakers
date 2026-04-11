@@ -23,10 +23,11 @@ export class ExplorationScene {
    * @param {Function} config.onSave - Called when player interacts with save terminal
    * @param {Function} config.onChest - Called with chest data when opening a chest
    */
-  constructor({ mapData, sceneManager, gameState, onEncounter, onDialogue, onMenu, onTransition, onSave, onChest }) {
+  constructor({ mapData, sceneManager, gameState, assets, onEncounter, onDialogue, onMenu, onTransition, onSave, onChest }) {
     this.mapData = mapData;
     this.sceneManager = sceneManager;
     this.gameState = gameState;
+    this.assets = assets || null;
     this.onEncounter = onEncounter;
     this.onDialogue = onDialogue;
     this.onMenu = onMenu;
@@ -224,8 +225,8 @@ export class ExplorationScene {
   _renderTiles(renderer) {
     const camX = renderer.camera.x;
     const camY = renderer.camera.y;
+    const tileset = this.assets && this.assets.get(this.mapData.tilesetId);
 
-    // Only render visible tiles
     const startCol = Math.max(0, Math.floor(camX / TILE_SIZE));
     const startRow = Math.max(0, Math.floor(camY / TILE_SIZE));
     const endCol = Math.min(this.mapData.width, Math.ceil((camX + BASE_WIDTH) / TILE_SIZE) + 1);
@@ -234,16 +235,19 @@ export class ExplorationScene {
     for (let row = startRow; row < endRow; row++) {
       for (let col = startCol; col < endCol; col++) {
         const tile = this.mapData.tiles[row]?.[col] ?? 1;
-        const color = this._getTileColor(tile);
-        const worldX = col * TILE_SIZE;
-        const worldY = row * TILE_SIZE;
-        const screenX = worldX - camX;
-        const screenY = worldY - camY;
-        renderer.drawRect(screenX, screenY, TILE_SIZE, TILE_SIZE, color);
 
-        // Tile border for walls
-        if (tile === 1) {
-          renderer.drawRectOutline(screenX, screenY, TILE_SIZE, TILE_SIZE, '#333');
+        if (tileset) {
+          // Use sprite tileset — drawTile handles camera offset internally
+          renderer.drawTile(tileset, tile, col, row);
+        } else {
+          // Fallback to colored rectangles
+          const color = this._getTileColor(tile);
+          const screenX = col * TILE_SIZE - camX;
+          const screenY = row * TILE_SIZE - camY;
+          renderer.drawRect(screenX, screenY, TILE_SIZE, TILE_SIZE, color);
+          if (tile === 1) {
+            renderer.drawRectOutline(screenX, screenY, TILE_SIZE, TILE_SIZE, '#333');
+          }
         }
       }
     }
@@ -251,63 +255,77 @@ export class ExplorationScene {
 
   _getTileColor(tileId) {
     switch (tileId) {
-      case 0: return '#2a2a3a'; // floor
-      case 1: return '#1a1a2a'; // wall
-      case 2: return '#2a3a2a'; // interactable
-      case 3: return '#3a2a2a'; // transition
-      case 4: return '#3a3a1a'; // hazard
+      case 0: return '#2a2a3a';
+      case 1: return '#1a1a2a';
+      case 2: return '#2a3a2a';
+      case 3: return '#3a2a2a';
+      case 4: return '#3a3a1a';
       default: return '#1a1a2a';
     }
   }
 
   _renderPlayer(renderer) {
     const worldPos = this.player.getWorldPosition();
-    const screenX = worldPos.x - renderer.camera.x;
-    const screenY = worldPos.y - renderer.camera.y;
 
-    // Placeholder: colored rectangle for the player
-    renderer.drawRect(screenX + 2, screenY + 2, TILE_SIZE - 4, TILE_SIZE - 4, '#4488ff');
+    // Try sprite-based rendering
+    const charId = this.gameState.party?.[0]?.id || 'sable';
+    const walkSheet = this.assets && this.assets.get('walk_' + charId);
 
-    // Direction indicator
-    const cx = screenX + TILE_SIZE / 2;
-    const cy = screenY + TILE_SIZE / 2;
-    const indicatorSize = 2;
-    let ix = cx, iy = cy;
-    switch (this.player.facing) {
-      case 'up': iy = screenY + 1; break;
-      case 'down': iy = screenY + TILE_SIZE - 3; break;
-      case 'left': ix = screenX + 1; break;
-      case 'right': ix = screenX + TILE_SIZE - 3; break;
+    if (walkSheet) {
+      // Spritesheet layout: 3 columns (walk frames) × 4 rows (down, left, right, up)
+      const dirRow = { down: 0, left: 1, right: 2, up: 3 };
+      const row = dirRow[this.player.facing] || 0;
+      // Derive walk frame from movement progress
+      let frame = 1; // neutral/standing
+      if (this.player.isMoving) {
+        frame = Math.floor(this.player._moveProgress / (TILE_SIZE / 3)) % 3;
+      }
+      const sx = frame * TILE_SIZE;
+      const sy = row * TILE_SIZE;
+      // drawSprite handles camera offset internally
+      renderer.drawSprite(walkSheet, sx, sy, TILE_SIZE, TILE_SIZE, worldPos.x, worldPos.y);
+    } else {
+      // Fallback
+      const screenX = worldPos.x - renderer.camera.x;
+      const screenY = worldPos.y - renderer.camera.y;
+      renderer.drawRect(screenX + 2, screenY + 2, TILE_SIZE - 4, TILE_SIZE - 4, '#4488ff');
     }
-    renderer.drawRect(ix - indicatorSize / 2, iy - indicatorSize / 2, indicatorSize, indicatorSize, '#fff');
   }
 
   _renderNPC(renderer, npc) {
-    const screenX = npc.gridX * TILE_SIZE - renderer.camera.x;
-    const screenY = npc.gridY * TILE_SIZE - renderer.camera.y;
+    const worldX = npc.gridX * TILE_SIZE;
+    const worldY = npc.gridY * TILE_SIZE;
+    const screenX = worldX - renderer.camera.x;
+    const screenY = worldY - renderer.camera.y;
 
-    // Only render if on screen
     if (screenX < -TILE_SIZE || screenX > BASE_WIDTH || screenY < -TILE_SIZE || screenY > BASE_HEIGHT) return;
 
-    renderer.drawRect(screenX + 2, screenY + 2, TILE_SIZE - 4, TILE_SIZE - 4, '#ffaa00');
-    renderer.drawText(npc.name[0], screenX + 4, screenY + 3, { color: '#000', size: 7 });
+    const npcSprite = this.assets && this.assets.get(npc.spriteId);
+    if (npcSprite) {
+      renderer.drawSprite(npcSprite, 0, 0, TILE_SIZE, TILE_SIZE, worldX, worldY);
+    } else {
+      renderer.drawRect(screenX + 2, screenY + 2, TILE_SIZE - 4, TILE_SIZE - 4, '#ffaa00');
+      renderer.drawText(npc.name[0], screenX + 4, screenY + 3, { color: '#000', size: 7 });
+    }
   }
 
   _renderInteractables(renderer) {
     if (!this.mapData.interactables) return;
 
     for (const obj of this.mapData.interactables) {
-      const screenX = obj.gridX * TILE_SIZE - renderer.camera.x;
-      const screenY = obj.gridY * TILE_SIZE - renderer.camera.y;
+      const worldX = obj.gridX * TILE_SIZE;
+      const worldY = obj.gridY * TILE_SIZE;
+      const screenX = worldX - renderer.camera.x;
+      const screenY = worldY - renderer.camera.y;
       if (screenX < -TILE_SIZE || screenX > BASE_WIDTH || screenY < -TILE_SIZE || screenY > BASE_HEIGHT) continue;
 
       if (obj.type === 'save_terminal') {
-        renderer.drawRect(screenX + 3, screenY + 3, TILE_SIZE - 6, TILE_SIZE - 6, '#00ff88');
+        renderer.drawRect(screenX + 2, screenY + 2, TILE_SIZE - 4, TILE_SIZE - 4, '#00ff88');
         renderer.drawText('S', screenX + 5, screenY + 3, { color: '#000', size: 7 });
       } else if (obj.type === 'chest') {
         const opened = this.gameState.chestsOpened?.includes(obj.id);
         const color = opened ? '#555' : '#ffcc00';
-        renderer.drawRect(screenX + 3, screenY + 3, TILE_SIZE - 6, TILE_SIZE - 6, color);
+        renderer.drawRect(screenX + 2, screenY + 2, TILE_SIZE - 4, TILE_SIZE - 4, color);
         renderer.drawText(opened ? 'o' : 'C', screenX + 5, screenY + 3, { color: '#000', size: 7 });
       }
     }

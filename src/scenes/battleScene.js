@@ -33,10 +33,12 @@ export class BattleScene {
    * @param {Function} config.onDefeat - Called on party wipe
    * @param {Function} config.onFlee - Called on successful flee
    */
-  constructor({ party, enemyIds, isBoss = false, inventory, progressionSystem, onVictory, onDefeat, onFlee }) {
+  constructor({ party, enemyIds, isBoss = false, inventory, progressionSystem, assets, mapId, onVictory, onDefeat, onFlee }) {
     this.party = party;
     this.inventory = inventory;
     this.progressionSystem = progressionSystem;
+    this.assets = assets || null;
+    this.mapId = mapId || '';
     this.onVictory = onVictory;
     this.onDefeat = onDefeat;
     this.onFlee = onFlee;
@@ -131,8 +133,15 @@ export class BattleScene {
   }
 
   render(renderer) {
-    // Background
     renderer.clear('#0f0f1a');
+
+    // Battle background
+    const bgKey = this.mapId.startsWith('undercroft') ? 'bg_undercroft' : 'bg_slagworks';
+    const bg = this.assets && this.assets.get(bgKey);
+    if (bg) {
+      renderer.drawRect(0, 0, BASE_WIDTH, 140, '#000');
+      renderer.ctx.drawImage(bg, 0, 0);
+    }
 
     // Battle field
     this._renderEnemies(renderer);
@@ -403,21 +412,29 @@ export class BattleScene {
 
     for (let i = 0; i < aliveEnemies.length; i++) {
       const e = aliveEnemies[i];
+      const spriteW = e.isBoss ? 32 : 24;
+      const spriteH = e.isBoss ? 32 : 24;
       const x = 20 + i * spacing;
-      const y = 40 + (i % 2) * 25;
+      const y = (e.isBoss ? 30 : 40) + (i % 2) * 25;
 
-      // Enemy sprite placeholder
-      const color = e.isBoss ? '#ff4444' : '#cc6666';
-      renderer.drawRect(x, y, 24, 24, color);
-      renderer.drawRectOutline(x, y, 24, 24, '#fff');
-      renderer.drawText(e.name.substring(0, 3), x + 2, y + 8, { color: '#fff', size: 6 });
+      const sprite = this.assets && this.assets.get(e.spriteId);
+      if (sprite) {
+        // Idle frame at sx=0, attack frame at sx=spriteW
+        renderer.ctx.drawImage(sprite, 0, 0, spriteW, spriteH,
+          x * 3, y * 3, spriteW * 3, spriteH * 3);
+      } else {
+        const color = e.isBoss ? '#ff4444' : '#cc6666';
+        renderer.drawRect(x, y, spriteW, spriteH, color);
+        renderer.drawRectOutline(x, y, spriteW, spriteH, '#fff');
+        renderer.drawText(e.name.substring(0, 3), x + 2, y + 8, { color: '#fff', size: 6 });
+      }
 
       // HP bar
-      renderer.drawBar(x, y + 26, 24, 3, e.currentHP, e.maxHP, '#f44', '#333');
+      renderer.drawBar(x, y + spriteH + 2, spriteW, 3, e.currentHP, e.maxHP, '#f44', '#333');
 
       // Target indicator
       if (this.state === BATTLE_STATES.TARGET_SELECT && this.targetList[this.targetIndex] === e) {
-        renderer.drawText('\u25bc', x + 10, y - 10, { color: '#ffcc00', size: 8 });
+        renderer.drawText('\u25bc', x + spriteW / 2 - 2, y - 10, { color: '#ffcc00', size: 8 });
       }
     }
   }
@@ -428,11 +445,17 @@ export class BattleScene {
       const x = BASE_WIDTH - 80 + (i % 2) * 30;
       const y = 30 + Math.floor(i / 2) * 40;
 
-      // Party member sprite placeholder
-      const color = m.currentHP > 0 ? '#4488ff' : '#444';
-      renderer.drawRect(x, y, 20, 24, color);
-      renderer.drawRectOutline(x, y, 20, 24, '#aaa');
-      renderer.drawText(m.name.substring(0, 3), x + 1, y + 8, { color: '#fff', size: 6 });
+      const sprite = this.assets && this.assets.get('battle_' + m.id);
+      if (sprite && m.currentHP > 0) {
+        // Battle spritesheet: 40×24 (idle at sx=0, attack at sx=20)
+        renderer.ctx.drawImage(sprite, 0, 0, 20, 24,
+          x * 3, y * 3, 20 * 3, 24 * 3);
+      } else {
+        const color = m.currentHP > 0 ? '#4488ff' : '#444';
+        renderer.drawRect(x, y, 20, 24, color);
+        renderer.drawRectOutline(x, y, 20, 24, '#aaa');
+        renderer.drawText(m.name.substring(0, 3), x + 1, y + 8, { color: '#fff', size: 6 });
+      }
 
       // Active turn indicator
       const current = this.combat.getCurrentTurnEntity();

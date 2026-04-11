@@ -23,6 +23,7 @@ import { PartyMember } from './entities/PartyMember.js';
 import { CHARACTERS } from './data/characters.js';
 import { getMap } from './data/maps.js';
 import { DIALOGUE } from './data/dialogue.js';
+import { generateAllSprites } from './sprites/spriteManifest.js';
 
 class Game {
   constructor() {
@@ -56,8 +57,12 @@ class Game {
     this._running = false;
   }
 
-  start() {
+  async start() {
     this.input.bind(window);
+
+    // Generate all sprites before rendering anything
+    await generateAllSprites(this.assets);
+
     this._showTitleScreen();
     this._running = true;
     this._lastTime = performance.now();
@@ -105,6 +110,7 @@ class Game {
   _showTitleScreen() {
     const titleScene = new TitleScene({
       sceneManager: this.sceneManager,
+      assets: this.assets,
       onNewGame: () => this._startNewGame(),
       onContinue: () => this._showLoadScreen()
     });
@@ -164,6 +170,7 @@ class Game {
       mapData,
       sceneManager: this.sceneManager,
       gameState: this.gameState,
+      assets: this.assets,
 
       onEncounter: (enemyIds) => {
         this._startBattle(enemyIds, false);
@@ -218,6 +225,8 @@ class Game {
       isBoss,
       inventory: this.inventory,
       progressionSystem: this.progression,
+      assets: this.assets,
+      mapId: this.gameState.currentMap,
 
       onVictory: (rewards) => {
         // Award XP
@@ -287,6 +296,7 @@ class Game {
     const dialogueScene = new DialogueScene({
       dialogueNodes,
       renderer: this.renderer,
+      assets: this.assets,
       onComplete: () => {
         this.sceneManager.pop();
       }
@@ -301,6 +311,7 @@ class Game {
       party: this.party,
       inventory: this.inventory,
       progressionSystem: this.progression,
+      assets: this.assets,
       onClose: () => {
         this.sceneManager.pop();
       }
@@ -350,12 +361,8 @@ function boot() {
   const canvas = document.getElementById('game-canvas');
   if (!canvas || canvas.dataset.booted) return;
   canvas.dataset.booted = 'true';
-  try {
-    const game = new Game();
-    game.start();
-  } catch (e) {
-    console.error('[Gearbreakers] Boot failed:', e);
-  }
+  const game = new Game();
+  game.start().catch(e => console.error('[Gearbreakers] Boot failed:', e));
 }
 
 if (document.readyState === 'loading') {

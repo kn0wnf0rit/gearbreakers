@@ -12,8 +12,9 @@ export class TitleScene {
    * @param {Function} config.onNewGame - Called when "New Game" is selected
    * @param {Function} config.onContinue - Called when "Continue" is selected (with saves available)
    */
-  constructor({ sceneManager, onNewGame, onContinue }) {
+  constructor({ sceneManager, assets, onNewGame, onContinue }) {
     this.sceneManager = sceneManager;
+    this.assets = assets || null;
     this.onNewGame = onNewGame;
     this.onContinue = onContinue;
 

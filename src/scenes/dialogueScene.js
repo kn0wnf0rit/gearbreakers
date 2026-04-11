@@ -12,10 +12,11 @@ export class DialogueScene {
    * @param {Function} config.onComplete - Called when all nodes are exhausted
    * @param {object} config.renderer - Renderer reference (unused currently, kept for parity)
    */
-  constructor({ dialogueNodes, onComplete, renderer }) {
+  constructor({ dialogueNodes, onComplete, renderer, assets }) {
     this.dialogueNodes = dialogueNodes;
     this.onComplete = onComplete;
     this.renderer = renderer;
+    this.assets = assets || null;
 
     this.transparent = true;
     this.currentNode = 0;
@@ -85,13 +86,24 @@ export class DialogueScene {
 
     const node = this.dialogueNodes[this.currentNode];
 
-    // Speaker name
-    renderer.drawText(node.speaker, 6, barY + 4, { color: '#ffcc00', size: 8 });
+    // Portrait
+    const portraitKey = 'portrait_' + node.speaker.toLowerCase();
+    const portrait = this.assets && this.assets.get(portraitKey);
+    const textX = portrait ? 42 : 6;
 
-    // Dialogue text (typewriter) -- wrap manually for the narrow resolution
-    const lines = this._wrapText(this.displayedText, 30);
+    if (portrait) {
+      renderer.ctx.drawImage(portrait, 0, 0, 32, 32,
+        6 * 3, (barY + 4) * 3, 32 * 3, 32 * 3);
+    }
+
+    // Speaker name
+    renderer.drawText(node.speaker, textX, barY + 4, { color: '#ffcc00', size: 8 });
+
+    // Dialogue text (typewriter)
+    const maxChars = portrait ? 22 : 30;
+    const lines = this._wrapText(this.displayedText, maxChars);
     for (let i = 0; i < lines.length; i++) {
-      renderer.drawText(lines[i], 6, barY + 16 + i * 10, { color: '#ffffff', size: 8 });
+      renderer.drawText(lines[i], textX, barY + 16 + i * 10, { color: '#ffffff', size: 8 });
     }
 
     // Blinking "down" indicator when text is complete

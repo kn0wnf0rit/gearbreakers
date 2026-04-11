@@ -17,10 +17,11 @@ export class MenuScene {
    * @param {object} config.progressionSystem - ProgressionSystem instance
    * @param {Function} config.onClose - Called when the menu is dismissed
    */
-  constructor({ party, inventory, progressionSystem, onClose }) {
+  constructor({ party, inventory, progressionSystem, assets, onClose }) {
     this.party = party;
     this.inventory = inventory;
     this.progressionSystem = progressionSystem;
+    this.assets = assets || null;
     this.onClose = onClose;
 
     this.transparent = true;
